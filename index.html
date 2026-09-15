@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Leitor local de arquivos XLF do Oracle ERP Cloud e BI Publisher"
+    />
+    <title>XLF Inspector · Oracle Cloud</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="XLF Inspector — início">
+        <span class="brand-mark" aria-hidden="true">X</span>
+        <span
+          ><strong>XLF Inspector</strong
+          ><small>Oracle Cloud Translation Reader</small></span
+        >
+      </a>
+      <div class="privacy">
+        <span class="privacy-dot"></span>Processamento 100% local
+      </div>
+    </header>
+
+    <main class="shell">
+      <section id="uploadView" class="upload-view">
+        <div class="hero-copy">
+          <span class="eyebrow">ANÁLISE DE TRADUÇÕES</span>
+          <h1>
+            Entenda seu arquivo XLF<br /><span>sem vasculhar o XML.</span>
+          </h1>
+          <p>
+            Visualize idiomas, metadados, cabeçalho, unidades de tradução e
+            propriedades técnicas em uma interface clara.
+          </p>
+        </div>
+
+        <label id="dropZone" class="drop-zone" for="fileInput">
+          <input
+            id="fileInput"
+            type="file"
+            accept=".xlf,.xliff,application/xml,text/xml"
+            hidden
+          />
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"
+              />
+            </svg>
+          </span>
+          <strong>Arraste seu arquivo XLF aqui</strong>
+          <span>ou clique para selecionar</span>
+          <em>.XLF ou .XLIFF · até 25 MB</em>
+        </label>
+        <div id="uploadError" class="error-box" role="alert" hidden></div>
+      </section>
+
+      <section id="appView" class="app-view" hidden>
+        <div class="file-heading">
+          <div>
+            <button id="newFileBtn" class="back-button" type="button">
+              ← Abrir outro arquivo
+            </button>
+            <h1 id="fileName">arquivo.xlf</h1>
+            <p id="fileSubline"></p>
+          </div>
+          <div class="heading-actions">
+            <button id="exportJsonBtn" class="button secondary" type="button">
+              Exportar JSON
+            </button>
+            <button id="exportCsvBtn" class="button secondary" type="button">
+              Exportar CSV
+            </button>
+            <button id="exportXlfBtn" class="button primary" type="button">
+              Exportar XLF
+            </button>
+          </div>
+        </div>
+
+        <div class="language-route" aria-label="Direção da tradução">
+          <div>
+            <span>Idioma atual · source</span
+            ><strong id="sourceLanguage">—</strong>
+          </div>
+          <span class="route-arrow" aria-hidden="true">→</span>
+          <div>
+            <span>Idioma da tradução · target</span
+            ><strong id="targetLanguage">—</strong>
+          </div>
+          <small id="translationAvailability"
+            >Verificando tradução local…</small
+          >
+        </div>
+
+        <nav class="tabs" aria-label="Seções do arquivo">
+          <button class="tab active" data-tab="overview" type="button">
+            Visão geral
+          </button>
+          <button class="tab" data-tab="header" type="button">Header</button>
+          <button class="tab" data-tab="translations" type="button">
+            Traduções <span id="tabCount" class="badge">0</span>
+          </button>
+          <button class="tab" data-tab="structure" type="button">
+            Estrutura XML
+          </button>
+        </nav>
+
+        <div id="overviewPanel" class="panel active" data-panel="overview">
+          <div id="statCards" class="stats-grid"></div>
+          <section class="content-card">
+            <div class="section-title">
+              <div>
+                <span class="kicker">FILE</span>
+                <h2>Metadados do arquivo</h2>
+              </div>
+            </div>
+            <div id="fileAttributes" class="detail-grid"></div>
+          </section>
+          <section class="content-card">
+            <div class="section-title">
+              <div>
+                <span class="kicker">DIAGNÓSTICO</span>
+                <h2>Status das traduções</h2>
+              </div>
+            </div>
+            <div id="qualityBars" class="quality-list"></div>
+          </section>
+        </div>
+
+        <div id="headerPanel" class="panel" data-panel="header">
+          <section class="content-card">
+            <div class="section-title">
+              <div>
+                <span class="kicker">HEADER</span>
+                <h2>Conteúdo do cabeçalho</h2>
+              </div>
+              <button id="toggleLongValues" class="text-button" type="button">
+                Mostrar valores longos
+              </button>
+            </div>
+            <div id="headerSummary" class="detail-grid"></div>
+            <div id="headerTree" class="xml-tree"></div>
+          </section>
+        </div>
+
+        <div id="translationsPanel" class="panel" data-panel="translations">
+          <section class="content-card table-card">
+            <div class="bulk-actions">
+              <div>
+                <strong id="selectedCount">0 selecionados</strong
+                ><span
+                  >Os IDs e as propriedades técnicas não serão alterados.</span
+                >
+              </div>
+              <div>
+                <button
+                  id="selectSameBtn"
+                  class="button secondary"
+                  type="button"
+                >
+                  Selecionar iguais ao source
+                </button>
+                <button id="addUnitBtn" class="button secondary" type="button">
+                  + Adicionar bloco
+                </button>
+                <button
+                  id="translateBtn"
+                  class="button primary"
+                  type="button"
+                  disabled
+                >
+                  Traduzir selecionados
+                </button>
+              </div>
+            </div>
+            <div id="translationProgress" class="translation-progress" hidden>
+              <div><span id="translationProgressBar"></span></div>
+              <p id="translationProgressText"></p>
+            </div>
+            <div class="table-toolbar">
+              <label class="search-box">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-4-4" />
+                </svg>
+                <input
+                  id="searchInput"
+                  type="search"
+                  placeholder="Buscar por ID, source, target, note ou propriedade…"
+                />
+              </label>
+              <select id="statusFilter" aria-label="Filtrar por status">
+                <option value="all">Todos os status</option>
+                <option value="translated">Traduzidos</option>
+                <option value="same">Iguais ao source</option>
+                <option value="empty">Target vazio</option>
+              </select>
+            </div>
+            <div class="result-line">
+              <span id="resultCount"></span
+              ><span>Clique em uma linha para ver todos os detalhes</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="check-col">
+                      <input
+                        id="selectAllVisible"
+                        type="checkbox"
+                        aria-label="Selecionar todos os itens visíveis"
+                      />
+                    </th>
+                    <th>ID</th>
+                    <th>Source</th>
+                    <th>Target</th>
+                    <th>Note</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="translationsBody"></tbody>
+              </table>
+            </div>
+            <div id="emptyResults" class="empty-results" hidden>
+              Nenhuma tradução encontrada para este filtro.
+            </div>
+          </section>
+        </div>
+
+        <div id="structurePanel" class="panel" data-panel="structure">
+          <section class="content-card">
+            <div class="section-title">
+              <div>
+                <span class="kicker">DOCUMENTO</span>
+                <h2>Árvore completa do XML</h2>
+              </div>
+            </div>
+            <p class="section-help">
+              Nós longos são resumidos para manter a leitura fluida. Expanda
+              cada item quando precisar do conteúdo integral.
+            </p>
+            <div id="fullTree" class="xml-tree"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="detailDialog" class="detail-dialog">
+      <div class="dialog-head">
+        <div>
+          <span class="kicker">TRANS-UNIT</span>
+          <h2 id="dialogTitle"></h2>
+        </div>
+        <button
+          id="closeDialog"
+          class="icon-button"
+          type="button"
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+      </div>
+      <div id="dialogContent" class="dialog-content"></div>
+    </dialog>
+
+    <dialog id="addDialog" class="detail-dialog compact-dialog">
+      <form id="addUnitForm">
+        <div class="dialog-head">
+          <div>
+            <span class="kicker">NOVO TRANS-UNIT</span>
+            <h2>Adicionar bloco de tradução</h2>
+          </div>
+          <button
+            class="icon-button close-add"
+            type="button"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
+        <div class="dialog-content">
+          <div class="form-grid">
+            <label
+              ><span>Prefixo do ID</span
+              ><input id="newIdPrefix" value="id349" required
+            /></label>
+            <label
+              ><span>ID gerado automaticamente</span
+              ><input id="newIdPreview" readonly
+            /></label>
+          </div>
+          <label class="form-field"
+            ><span>Source</span
+            ><textarea
+              id="newSource"
+              rows="4"
+              required
+              placeholder="Ex.: Consolidated Result"
+            ></textarea>
+          </label>
+          <label class="form-field"
+            ><span>Target</span
+            ><textarea
+              id="newTarget"
+              rows="4"
+              placeholder="Pode deixar vazio e traduzir depois"
+            ></textarea>
+          </label>
+          <label class="form-field"
+            ><span>Note</span
+            ><input id="newNote" placeholder="Ex.: Text located: body/table"
+          /></label>
+          <div class="dialog-actions">
+            <button class="button secondary close-add" type="button">
+              Cancelar</button
+            ><button class="button primary" type="submit">
+              Adicionar bloco
+            </button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <footer>
+      <span>XLF Inspector · Desenvolvido por Gabriel Almeida ·</span>
+
+      <a
+        href="https://www.linkedin.com/in/gabriel-almeida1999/"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        LinkedIn
+      </a>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>
