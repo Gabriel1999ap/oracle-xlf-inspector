@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Leitor local de arquivos XLF do Oracle ERP Cloud e BI Publisher"
+      content="Ferramenta local para ler, revisar, traduzir e exportar arquivos XLF do Oracle ERP Cloud e BI Publisher"
     />
-    <title>XLF Inspector · Oracle Cloud</title>
+    <title>XLF Inspector - Tradutor XLF para Oracle Cloud</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#" aria-label="XLF Inspector — início">
+      <a class="brand" href="#" aria-label="XLF Inspector - inicio">
         <span class="brand-mark" aria-hidden="true">X</span>
         <span
           ><strong>XLF Inspector</strong
-          ><small>Oracle Cloud Translation Reader</small></span
+          ><small>Leitor e tradutor local de XLF</small></span
         >
       </a>
       <div class="privacy">
@@ -27,13 +27,15 @@
     <main class="shell">
       <section id="uploadView" class="upload-view">
         <div class="hero-copy">
-          <span class="eyebrow">ANÁLISE DE TRADUÇÕES</span>
+          <span class="eyebrow">ORACLE XLF / BI PUBLISHER</span>
           <h1>
-            Entenda seu arquivo XLF<br /><span>sem vasculhar o XML.</span>
+            Revise e traduza arquivos XLF<br /><span>sem quebrar o XML.</span>
           </h1>
           <p>
-            Visualize idiomas, metadados, cabeçalho, unidades de tradução e
-            propriedades técnicas em uma interface clara.
+            Abra um XLF do Oracle, confira source e target, traduza os textos
+            selecionados usando o source como referência e exporte um novo
+            arquivo preservando IDs, variáveis, notes, prop-groups e o
+            cabeçalho técnico.
           </p>
         </div>
 
@@ -51,9 +53,9 @@
               />
             </svg>
           </span>
-          <strong>Arraste seu arquivo XLF aqui</strong>
-          <span>ou clique para selecionar</span>
-          <em>.XLF ou .XLIFF · até 25 MB</em>
+          <strong>Abra o XLF que deseja revisar ou traduzir</strong>
+          <span>Tudo roda no navegador: nenhum arquivo é enviado para servidor</span>
+          <em>.XLF ou .XLIFF - até 25 MB</em>
         </label>
         <div id="uploadError" class="error-box" role="alert" hidden></div>
       </section>
