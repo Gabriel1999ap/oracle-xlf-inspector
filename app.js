@@ -1,6 +1,76 @@
 "use strict";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const LANGUAGE_OPTIONS = [
+  ["pt-BR", "Português (Brasil)"],
+  ["en-US", "Inglês (Estados Unidos)"],
+];
+const LANGUAGE_FALLBACKS = {
+  en: "en-US",
+  "en-US": "en-US",
+  "en-GB": "en-US",
+  pt: "pt-BR",
+  "pt-BR": "pt-BR",
+  "pt-PT": "pt-BR",
+};
+const PORTUGUESE_HINTS = new Set([
+  "a",
+  "as",
+  "ao",
+  "aos",
+  "da",
+  "das",
+  "de",
+  "do",
+  "dos",
+  "e",
+  "em",
+  "na",
+  "nas",
+  "no",
+  "nos",
+  "o",
+  "os",
+  "para",
+  "por",
+  "sem",
+  "com",
+  "analise",
+  "avaliacao",
+  "baseline",
+  "comercial",
+  "condicao",
+  "contrato",
+  "correcao",
+  "data",
+  "declinios",
+  "empresas",
+  "final",
+  "fornecedor",
+  "fornecedores",
+  "gestor",
+  "historico",
+  "itens",
+  "justificativa",
+  "melhor",
+  "monetaria",
+  "motivo",
+  "numero",
+  "periodo",
+  "processo",
+  "proposta",
+  "propostas",
+  "quantidade",
+  "requisicao",
+  "respostas",
+  "resultado",
+  "resumo",
+  "sumula",
+  "tecnica",
+  "tecnico",
+  "valor",
+  "vigencia",
+]);
 const state = {
   file: null,
   originalText: "",
@@ -11,6 +81,11 @@ const state = {
   showLong: false,
   translator: null,
   translationAvailable: false,
+  translationConfig: {
+    sourceLanguage: "",
+    targetLanguage: "",
+    updateTargetLanguage: false,
+  },
   newSequence: 0,
 };
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -41,6 +116,10 @@ const els = {
   dialogContent: $("#dialogContent"),
   sourceLanguage: $("#sourceLanguage"),
   targetLanguage: $("#targetLanguage"),
+  translationSourceLanguage: $("#translationSourceLanguage"),
+  translationTargetLanguage: $("#translationTargetLanguage"),
+  updateTargetLanguage: $("#updateTargetLanguage"),
+  targetLanguageExportNotice: $("#targetLanguageExportNotice"),
   translationAvailability: $("#translationAvailability"),
   selectedCount: $("#selectedCount"),
   translateBtn: $("#translateBtn"),
@@ -99,9 +178,14 @@ $("#addUnitForm").addEventListener("submit", addUnit);
 );
 els.searchInput.addEventListener("input", renderTranslations);
 els.statusFilter.addEventListener("change", renderTranslations);
+[els.translationSourceLanguage, els.translationTargetLanguage].forEach((input) =>
+  input.addEventListener("change", updateTranslationConfig),
+);
+els.updateTargetLanguage.addEventListener("change", updateTranslationConfig);
 $$(".tab").forEach((tab) =>
   tab.addEventListener("click", () => activateTab(tab.dataset.tab)),
 );
+setupLanguageSelects();
 
 async function loadFile(file) {
   hideError();
@@ -133,6 +217,7 @@ async function loadFile(file) {
     state.selected.clear();
     state.translator = null;
     state.newSequence = 0;
+    initializeTranslationConfig();
     state.units = parsedNodes.map((node, index) =>
       parseUnit(node, index, rawUnits[index] || null),
     );
@@ -194,6 +279,7 @@ function renderAll() {
   els.fileSubline.textContent = `${formatBytes(state.file.size)} · XLIFF ${state.xml.documentElement.getAttribute("version") || "—"} · ${state.units.length} unidades`;
   els.sourceLanguage.textContent = attrs["source-language"] || "Não informado";
   els.targetLanguage.textContent = attrs["target-language"] || "Não informado";
+  renderTranslationConfigSummary();
   els.tabCount.textContent = state.units.length;
   const stats = [
     [
@@ -251,6 +337,67 @@ function renderAll() {
   renderTranslations();
   renderStructure();
   updateSelectionUi();
+}
+
+function initializeTranslationConfig() {
+  const attrs = attributesOf(state.fileNode);
+  state.translationConfig = {
+    sourceLanguage: supportedLanguage(attrs["source-language"]) || "pt-BR",
+    targetLanguage: supportedLanguage(attrs["target-language"]) || "en-US",
+    updateTargetLanguage: false,
+  };
+  state.translator = null;
+  syncTranslationConfigControls();
+}
+
+function setupLanguageSelects() {
+  [els.translationSourceLanguage, els.translationTargetLanguage].forEach(
+    (select) => {
+      select.replaceChildren(
+        ...LANGUAGE_OPTIONS.map(([value, label]) =>
+          elementFromHTML(
+            `<option value="${escapeHtml(value)}">${escapeHtml(label)} · ${escapeHtml(value)}</option>`,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+function syncTranslationConfigControls() {
+  els.translationSourceLanguage.value = state.translationConfig.sourceLanguage;
+  els.translationTargetLanguage.value = state.translationConfig.targetLanguage;
+  els.updateTargetLanguage.checked = state.translationConfig.updateTargetLanguage;
+  renderTranslationConfigSummary();
+}
+
+function updateTranslationConfig() {
+  const nextTarget = els.translationTargetLanguage.value;
+  state.translationConfig = {
+    sourceLanguage: els.translationSourceLanguage.value.trim(),
+    targetLanguage: nextTarget.trim(),
+    updateTargetLanguage: els.updateTargetLanguage.checked,
+  };
+  state.translator = null;
+  renderTranslationConfigSummary();
+  checkTranslationAvailability();
+  updateSelectionUi();
+}
+
+function renderTranslationConfigSummary() {
+  const attrs = attributesOf(state.fileNode);
+  const declaredTarget = attrs["target-language"] || "";
+  const configuredTarget = state.translationConfig.targetLanguage;
+  const configuredLabel = languageLabel(configuredTarget);
+  if (!state.translationConfig.updateTargetLanguage) {
+    els.targetLanguageExportNotice.textContent =
+      "Não alterar target-language na exportação.";
+    return;
+  }
+  els.targetLanguageExportNotice.textContent =
+    declaredTarget && declaredTarget !== configuredTarget
+      ? `Atualizar target-language de ${declaredTarget} para ${configuredLabel} ao exportar.`
+      : `Atualizar target-language para ${configuredLabel} ao exportar.`;
 }
 
 function qualityCounts() {
@@ -536,7 +683,12 @@ async function checkTranslationAvailability() {
   if (!source || !target)
     return setTranslationAvailability(
       false,
-      "Informe source-language e target-language no XLF.",
+      "Informe origem real e destino da tradução na configuração.",
+    );
+  if (source === target)
+    return setTranslationAvailability(
+      false,
+      `Origem e destino configurados para o mesmo idioma do tradutor (${source}). Escolha idiomas diferentes.`,
     );
   if (!("Translator" in self))
     return setTranslationAvailability(
@@ -607,7 +759,7 @@ async function translateSelected() {
           state.translator,
           unit.source,
         );
-        updateTarget(unit, restored);
+        updateTarget(unit, alignTargetStyle(unit.source, restored));
       } catch (error) {
         errors.push(`${unit.id}: ${error.message}`);
       }
@@ -627,6 +779,183 @@ async function translateSelected() {
   }
 }
 
+function alignTargetStyle(source, target) {
+  const sourceText = String(source || "");
+  let targetText = String(target || "");
+  if (!sourceText.trim() || !targetText.trim()) return targetText;
+  if (isAllUpperText(sourceText))
+    return preserveSourceAcronyms(
+      sourceText,
+      transformOutsideTokens(targetText, (text) => text.toLocaleUpperCase()),
+    );
+  if (isAllUpperText(targetText))
+    targetText = transformOutsideTokens(targetText, (text) =>
+      text.toLocaleLowerCase(),
+    );
+  if (isTitleLike(sourceText))
+    return preserveSourceAcronyms(
+      sourceText,
+      transformOutsideTokens(targetText, (text) =>
+        transformWords(text, (word) => capitalizeWord(word)),
+      ),
+    );
+  const sourceFirstUpper = firstLetter(sourceText)?.isUpper;
+  if (sourceFirstUpper === true)
+    return preserveSourceAcronyms(
+      sourceText,
+      transformFirstLetterOutsideTokens(targetText, "upper"),
+    );
+  if (sourceFirstUpper === false)
+    return preserveSourceAcronyms(
+      sourceText,
+      transformFirstLetterOutsideTokens(targetText, "lower"),
+    );
+  return preserveSourceAcronyms(sourceText, targetText);
+}
+
+function transformOutsideTokens(text, transform) {
+  const parts = [];
+  let cursor = 0;
+  for (const match of String(text).matchAll(protectedTokenPattern())) {
+    if (match.index > cursor) parts.push(transform(text.slice(cursor, match.index)));
+    parts.push(match[0]);
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) parts.push(transform(text.slice(cursor)));
+  return parts.join("");
+}
+
+function transformFirstLetterOutsideTokens(text, mode) {
+  let changed = false;
+  return transformOutsideTokens(text, (segment) => {
+    if (changed) return segment;
+    const next = transformFirstLetter(segment, mode);
+    changed = /\p{L}/u.test(segment);
+    return next;
+  });
+}
+
+function preserveSourceAcronyms(source, target) {
+  const acronyms = acronymWords(source);
+  if (!acronyms.length) return target;
+  return transformOutsideTokens(target, (segment) => {
+    let result = segment;
+    acronyms.forEach((acronym) => {
+      result = result.replace(
+        new RegExp(`\\b${escapeRegExp(acronym)}\\b`, "gi"),
+        acronym,
+      );
+    });
+    return result;
+  });
+}
+
+function acronymWords(text) {
+  return [
+    ...new Set(
+      (stripProtectedTokens(text).match(/\b[A-Z0-9]{2,}\b/g) || []).filter(
+        (word) => /[A-Z]/.test(word),
+      ),
+    ),
+  ];
+}
+
+function isAllUpperText(text) {
+  const letters = lettersOf(text);
+  return (
+    letters.length > 1 &&
+    letters.some((letter) => hasCase(letter)) &&
+    letters.every((letter) => !isLowerLetter(letter))
+  );
+}
+
+function isTitleLike(text) {
+  const words =
+    stripProtectedTokens(text).match(/[^\s:[\]().,;!?/\\&]+/g) || [];
+  if (
+    words.some(
+      (word) => word.length <= 3 && firstLetter(word)?.isUpper === false,
+    )
+  )
+    return false;
+  const significant = words.filter((word) => word.length > 2);
+  if (!significant.length) return false;
+  return significant.every((word) => {
+    if (isAllUpperText(word)) return true;
+    return firstLetter(word)?.isUpper === true;
+  });
+}
+
+function stripProtectedTokens(text) {
+  return String(text).replace(protectedTokenPattern(), " ");
+}
+
+function normalizedWords(text) {
+  return (String(text).match(/\p{L}[\p{L}\p{M}]*/gu) || []).map((word) =>
+    normalize(word),
+  );
+}
+
+function transformWords(text, transform) {
+  let index = 0;
+  return String(text).replace(/\p{L}[\p{L}\p{M}]*/gu, (word) =>
+    transform(word, index++),
+  );
+}
+
+function capitalizeWord(word) {
+  const match = /\p{L}/u.exec(word);
+  if (!match) return word;
+  const index = match.index;
+  return (
+    word.slice(0, index) +
+    word[index].toLocaleUpperCase() +
+    word.slice(index + 1).toLocaleLowerCase()
+  );
+}
+
+function transformFirstLetter(text, mode) {
+  const match = /\p{L}/u.exec(text);
+  if (!match) return text;
+  const index = match.index;
+  const letter =
+    mode === "upper"
+      ? text[index].toLocaleUpperCase()
+      : text[index].toLocaleLowerCase();
+  return text.slice(0, index) + letter + text.slice(index + 1);
+}
+
+function firstLetter(text) {
+  const match = /\p{L}/u.exec(text);
+  if (!match) return null;
+  return {
+    value: match[0],
+    isUpper: isUpperLetter(match[0]),
+  };
+}
+
+function lettersOf(text) {
+  return String(text).match(/\p{L}/gu) || [];
+}
+
+function hasCase(letter) {
+  return isUpperLetter(letter) || isLowerLetter(letter);
+}
+
+function isUpperLetter(letter) {
+  return (
+    letter.toLocaleUpperCase() === letter &&
+    letter.toLocaleLowerCase() !== letter
+  );
+}
+
+function isLowerLetter(letter) {
+  return (
+    letter.toLocaleLowerCase() === letter &&
+    letter.toLocaleUpperCase() !== letter
+  );
+}
+
 function protectTokens(text) {
   const tokenPattern = protectedTokenPattern();
   const tokens = [];
@@ -643,38 +972,30 @@ function protectedTokenPattern() {
 }
 
 async function translatePreservingTokens(translator, source) {
-  const protectedText = protectTokens(source);
-  try {
-    const translated = await translator.translate(protectedText.text);
-    return restoreTokens(translated, protectedText.tokens);
-  } catch (placeholderError) {
-    const parts = [];
-    let cursor = 0;
-    for (const match of source.matchAll(protectedTokenPattern())) {
-      if (match.index > cursor)
-        parts.push(
-          await translateTextSegment(
-            translator,
-            source.slice(cursor, match.index),
-          ),
-        );
-      parts.push(match[0]);
-      cursor = match.index + match[0].length;
-    }
-    if (cursor < source.length)
-      parts.push(await translateTextSegment(translator, source.slice(cursor)));
-    if (!parts.length) return translateTextSegment(translator, source);
-    const result = parts.join("");
-    const expected = protectedText.tokens.map((item) => item.token);
-    const actual = protectTokens(result).tokens.map((item) => item.token);
-    if (JSON.stringify(expected) !== JSON.stringify(actual))
-      throw placeholderError;
-    return result;
+  const parts = [];
+  let cursor = 0;
+  for (const match of source.matchAll(protectedTokenPattern())) {
+    if (match.index > cursor)
+      parts.push(
+        await translateTextSegment(translator, source.slice(cursor, match.index)),
+      );
+    parts.push(match[0]);
+    cursor = match.index + match[0].length;
   }
+  if (cursor < source.length)
+    parts.push(await translateTextSegment(translator, source.slice(cursor)));
+  if (!parts.length) return translateTextSegment(translator, source);
+  const result = parts.join("");
+  const expected = tokenSequence(source);
+  const actual = tokenSequence(result);
+  if (JSON.stringify(expected) !== JSON.stringify(actual))
+    throw new Error("a validação final das variáveis falhou");
+  return result;
 }
 
 async function translateTextSegment(translator, segment) {
   if (!segment.trim()) return segment;
+  if (shouldKeepSegment(segment)) return segment;
   const leading = segment.match(/^\s*/)[0];
   const trailing = segment.match(/\s*$/)[0];
   const core = segment.slice(
@@ -682,6 +1003,17 @@ async function translateTextSegment(translator, segment) {
     segment.length - trailing.length || undefined,
   );
   return leading + (await translator.translate(core)) + trailing;
+}
+
+function shouldKeepSegment(segment) {
+  const { source, target } = languagePair();
+  if (source !== "pt" || target !== "en") return false;
+  const text = stripProtectedTokens(segment).trim();
+  if (!text || !/[A-Za-zÀ-ÿ]/.test(text)) return true;
+  if (/[À-ÿ]/.test(text)) return false;
+  const words = normalizedWords(text);
+  if (!words.length) return true;
+  return !words.some((word) => PORTUGUESE_HINTS.has(word));
 }
 
 function restoreTokens(translated, tokens) {
@@ -706,8 +1038,19 @@ function exportXlf() {
     return alert(
       `Não é possível exportar: existem IDs repetidos: ${duplicates.join(", ")}`,
     );
+  const tokenErrors = exportTokenErrors();
+  if (tokenErrors.length)
+    return alert(
+      "Não é possível exportar: as variáveis do source e do target não estão na mesma quantidade e ordem.\n\n" +
+        tokenErrors.slice(0, 8).join("\n") +
+        (tokenErrors.length > 8
+          ? `\n... e mais ${tokenErrors.length - 8} unidade(s).`
+          : ""),
+    );
   try {
     const patches = [];
+    const targetLanguagePatch = fileTargetLanguagePatch();
+    if (targetLanguagePatch) patches.push(targetLanguagePatch);
     state.units
       .filter((unit) => !unit.isNew && unit.changed)
       .forEach((unit) => {
@@ -735,6 +1078,54 @@ function exportXlf() {
       `Exportação interrompida para proteger o arquivo original. ${error.message}`,
     );
   }
+}
+
+function exportTokenErrors() {
+  return state.units
+    .filter((unit) => unit.changed || unit.isNew)
+    .filter((unit) => !sameTokenSequence(unit.source, unit.target))
+    .map((unit) => {
+      const sourceTokens = tokenSequence(unit.source);
+      const targetTokens = tokenSequence(unit.target);
+      return `${unit.id}: source [${sourceTokens.join(", ")}] / target [${targetTokens.join(", ")}]`;
+    });
+}
+
+function sameTokenSequence(source, target) {
+  const sourceTokens = tokenSequence(source);
+  const targetTokens = tokenSequence(target);
+  return JSON.stringify(sourceTokens) === JSON.stringify(targetTokens);
+}
+
+function tokenSequence(text) {
+  return protectTokens(text).tokens.map((item) => item.token);
+}
+
+function fileTargetLanguagePatch() {
+  if (!state.translationConfig.updateTargetLanguage) return null;
+  const targetLanguage = state.translationConfig.targetLanguage.trim();
+  if (!targetLanguage)
+    throw new Error(
+      "Atualização de target-language marcada, mas nenhum destino foi informado.",
+    );
+  const fileTag = /<(?:[\w.-]+:)?file\b[^>]*>/i.exec(state.originalText);
+  if (!fileTag) throw new Error("A tag <file> não foi encontrada.");
+  const raw = fileTag[0];
+  const attr = /\btarget-language\s*=\s*(["'])(.*?)\1/i.exec(raw);
+  if (attr) {
+    const valueOffset = attr[0].match(/^[\s\S]*?=\s*["']/)[0].length;
+    return {
+      start: fileTag.index + attr.index + valueOffset,
+      end: fileTag.index + attr.index + valueOffset + attr[2].length,
+      value: escapeXmlAttribute(targetLanguage),
+    };
+  }
+  const insertAt = fileTag.index + raw.length - (raw.endsWith("/>") ? 2 : 1);
+  return {
+    start: insertAt,
+    end: insertAt,
+    value: ` target-language="${escapeXmlAttribute(targetLanguage)}"`,
+  };
 }
 
 function targetPatch(rawInfo, target) {
@@ -794,6 +1185,7 @@ function insertNewUnits(text, units) {
   const beforeClose = text.slice(0, close.index);
   const closingLineStart = beforeClose.lastIndexOf("\n") + 1;
   const bodyIndent = beforeClose.slice(closingLineStart).match(/^\s*/)[0];
+  const contentBeforeClose = beforeClose.slice(0, closingLineStart);
   const unitIndent = bodyIndent + detectIndentUnit(text);
   const childIndent = unitIndent + detectIndentUnit(text);
   const blocks = units
@@ -804,8 +1196,16 @@ function insertNewUnits(text, units) {
       return `${unitIndent}<trans-unit id="${escapeXmlAttribute(unit.id)}">\n${childIndent}<source>${escapeXmlText(unit.source)}</source>\n${childIndent}<target>${escapeXmlText(unit.target)}</target>${note}\n${unitIndent}</trans-unit>`;
     })
     .join("\n");
-  const separator = beforeClose.endsWith("\n") ? "" : "\n";
-  return beforeClose + separator + blocks + "\n" + text.slice(close.index);
+  const separator =
+    !contentBeforeClose || contentBeforeClose.endsWith("\n") ? "" : "\n";
+  return (
+    contentBeforeClose +
+    separator +
+    blocks +
+    "\n" +
+    bodyIndent +
+    text.slice(close.index)
+  );
 }
 
 function exportCsv() {
@@ -902,6 +1302,12 @@ function resetApp() {
   els.fileInput.value = "";
   els.searchInput.value = "";
   els.statusFilter.value = "all";
+  state.translationConfig = {
+    sourceLanguage: "",
+    targetLanguage: "",
+    updateTargetLanguage: false,
+  };
+  syncTranslationConfigControls();
   els.appView.hidden = true;
   els.uploadView.hidden = false;
   els.translationProgress.hidden = true;
@@ -951,11 +1357,20 @@ function slugId(value) {
 }
 
 function languagePair() {
-  const attrs = attributesOf(state.fileNode);
   return {
-    source: translatorLanguage(attrs["source-language"]),
-    target: translatorLanguage(attrs["target-language"]),
+    source: translatorLanguage(state.translationConfig.sourceLanguage),
+    target: translatorLanguage(state.translationConfig.targetLanguage),
   };
+}
+
+function supportedLanguage(code) {
+  if (!code) return "";
+  return LANGUAGE_FALLBACKS[code] || LANGUAGE_FALLBACKS[translatorLanguage(code)] || "";
+}
+
+function languageLabel(code) {
+  const option = LANGUAGE_OPTIONS.find(([value]) => value === code);
+  return option ? `${option[1]} · ${option[0]}` : code;
 }
 
 function translatorLanguage(code) {
@@ -1063,6 +1478,9 @@ function escapeXmlText(value) {
 }
 function escapeXmlAttribute(value) {
   return escapeXmlText(value).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function elementFromHTML(html) {
   const template = document.createElement("template");

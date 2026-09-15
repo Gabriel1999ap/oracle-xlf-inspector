@@ -307,6 +307,58 @@ button {
 .language-route small.unavailable {
   color: #a33a2e;
 }
+.translation-config {
+  margin-top: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 5px 20px rgba(24, 35, 50, 0.035);
+}
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.config-grid label span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.config-grid input,
+.config-grid select {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: white;
+}
+.config-grid input:focus,
+.config-grid select:focus {
+  outline: 0;
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(199, 70, 52, 0.09);
+}
+.target-language-option {
+  margin-top: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.target-language-option input {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  accent-color: var(--red);
+}
 .tabs {
   margin-top: 35px;
   border-bottom: 1px solid var(--line);
@@ -924,6 +976,9 @@ footer a:hover {
     grid-column: 1/-1;
     max-width: none;
   }
+  .config-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .bulk-actions {
     align-items: flex-start;
     flex-direction: column;
@@ -975,6 +1030,12 @@ footer a:hover {
   .language-route {
     grid-template-columns: 1fr 32px 1fr;
     padding: 14px;
+  }
+  .translation-config {
+    padding: 14px;
+  }
+  .config-grid {
+    grid-template-columns: 1fr;
   }
   .bulk-actions > div:last-child {
     width: 100%;

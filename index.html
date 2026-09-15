@@ -82,18 +82,40 @@
 
         <div class="language-route" aria-label="Direção da tradução">
           <div>
-            <span>Idioma atual · source</span
+            <span>Idioma declarado · source</span
             ><strong id="sourceLanguage">—</strong>
           </div>
           <span class="route-arrow" aria-hidden="true">→</span>
           <div>
-            <span>Idioma da tradução · target</span
+            <span>Idioma declarado · target</span
             ><strong id="targetLanguage">—</strong>
           </div>
           <small id="translationAvailability"
             >Verificando tradução local…</small
           >
         </div>
+
+        <section
+          class="translation-config"
+          aria-label="Configuração da tradução"
+        >
+          <div class="config-grid">
+            <label>
+              <span>O texto está em</span>
+              <select id="translationSourceLanguage"></select>
+            </label>
+            <label>
+              <span>Traduzir para</span>
+              <select id="translationTargetLanguage"></select>
+            </label>
+          </div>
+          <label class="target-language-option">
+            <input id="updateTargetLanguage" type="checkbox" />
+            <span id="targetLanguageExportNotice"
+              >Não alterar target-language na exportação.</span
+            >
+          </label>
+        </section>
 
         <nav class="tabs" aria-label="Seções do arquivo">
           <button class="tab active" data-tab="overview" type="button">
